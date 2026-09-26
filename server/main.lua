@@ -1,5 +1,23 @@
 local health = { state = 'starting', phase = 'migration', contract = 1 }
 
+local function RegisterChatSuggestions()
+    if GetResourceState('feather-chat') ~= 'started' then return end
+    for _, suggestion in ipairs({
+        { key='feather-character.logout', trigger='/logout',
+            description='Return to character selection' },
+        { key='feather-character.savequit', trigger='/savequit',
+            description='Save your position and leave the server' }
+    }) do
+        local called, result = pcall(function()
+            return exports['feather-chat']:RegisterSuggestion(suggestion)
+        end)
+        if not called or (type(result) == 'table' and not result.ok and result.code ~= 'conflict') then
+            print(('[feather-character-v2] chat suggestion registration failed key=%s code=%s'):format(
+                suggestion.key, tostring(type(result) == 'table' and result.code or 'unavailable')))
+        end
+    end
+end
+
 local function Empty(payload)
     return type(payload) == 'table' and next(payload) == nil, 'No payload fields are accepted.'
 end
@@ -174,6 +192,7 @@ local function Start()
         error('Character profile provider registration failed.')
     end
     health.state, health.phase = 'ready', 'first_playable'
+    RegisterChatSuggestions()
     print('[feather-character-v2] first-playable server contracts ready')
 end
 
@@ -191,6 +210,10 @@ RegisterCommand('CharacterV2Status', function(source)
         tostring(health.state), tostring(health.phase), tostring(health.contract),
         tostring(health.failure or 'none')))
 end, true)
+
+AddEventHandler('onResourceStart', function(startedResource)
+    if startedResource == 'feather-chat' then RegisterChatSuggestions() end
+end)
 
 CreateThread(function()
     local ok, failure = xpcall(Start, debug.traceback)
